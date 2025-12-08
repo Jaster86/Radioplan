@@ -30,7 +30,9 @@ const Configuration: React.FC = () => {
         configActiveTab,
         setConfigActiveTab,
         configRcpWeekOffset,
-        setConfigRcpWeekOffset
+        setConfigRcpWeekOffset,
+        countingPeriods,
+        createNewCountingPeriod
     } = useContext(AppContext);
 
     const tableContainerRef = useRef<HTMLDivElement>(null);
@@ -62,6 +64,9 @@ const Configuration: React.FC = () => {
 
     const [selectedExceptionSlot, setSelectedExceptionSlot] = useState<ScheduleSlot | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showNewPeriodModal, setShowNewPeriodModal] = useState(false);
+    const [newPeriodDate, setNewPeriodDate] = useState('');
+    const [newPeriodName, setNewPeriodName] = useState('');
 
     useEffect(() => {
         console.log('📋 Template changed, syncing tempTemplate. Length:', template.length, 'isSaving:', isSavingRef.current);

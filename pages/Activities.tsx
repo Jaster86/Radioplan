@@ -65,13 +65,22 @@ const Activities: React.FC = () => {
     const currentWeekKey = currentWeekStart.toISOString().split('T')[0];
     const isCurrentWeekValidated = validatedWeeks?.includes(currentWeekKey) || false;
 
-    // Check if we can navigate to previous week (must not go before start date)
+    // Check if we can navigate to previous week (must not go before start date's week)
     const canNavigatePrevious = useMemo(() => {
         if (!activitiesStartDate) return true;
+        // Get the Monday of the start date's week
         const startDate = new Date(activitiesStartDate);
+        const startDay = startDate.getDay();
+        const startMonday = new Date(startDate);
+        startMonday.setDate(startDate.getDate() - startDay + (startDay === 0 ? -6 : 1));
+        startMonday.setHours(0, 0, 0, 0);
+
+        // Get the previous week's Monday
         const prevWeek = new Date(currentWeekStart);
         prevWeek.setDate(prevWeek.getDate() - 7);
-        return prevWeek >= startDate;
+
+        // Allow navigation if previous week is >= start week
+        return prevWeek >= startMonday;
     }, [activitiesStartDate, currentWeekStart]);
 
     // Compute Effective History Locally for Screen Stats if date is set
@@ -452,12 +461,17 @@ const Activities: React.FC = () => {
         selectedDate.setDate(diff);
         selectedDate.setHours(0, 0, 0, 0);
 
-        // Block navigation before start date
+        // Block navigation before start date's week
         if (activitiesStartDate) {
-            const startDate = new Date(activitiesStartDate);
-            startDate.setHours(0, 0, 0, 0);
-            if (selectedDate < startDate) {
-                alert(`Navigation impossible: La date sélectionnée est antérieure à la date de début des activités (${new Date(activitiesStartDate).toLocaleDateString('fr-FR')})`);
+            // Get the Monday of the start date's week
+            const startDateObj = new Date(activitiesStartDate);
+            const startDay = startDateObj.getDay();
+            const startMonday = new Date(startDateObj);
+            startMonday.setDate(startDateObj.getDate() - startDay + (startDay === 0 ? -6 : 1));
+            startMonday.setHours(0, 0, 0, 0);
+
+            if (selectedDate < startMonday) {
+                alert(`Navigation impossible: La date sélectionnée est antérieure à la semaine de début des activités (semaine du ${startMonday.toLocaleDateString('fr-FR')})`);
                 return;
             }
         }
@@ -478,7 +492,7 @@ const Activities: React.FC = () => {
         if (viewMode === 'WEEK') {
             const newOffset = weekOffset + (direction === 'next' ? 1 : -1);
 
-            // Block navigation before start date
+            // Block navigation before start date's week
             if (direction === 'prev' && activitiesStartDate) {
                 const today = new Date();
                 const todayDay = today.getDay();
@@ -489,9 +503,14 @@ const Activities: React.FC = () => {
                 const newDate = new Date(todayMonday);
                 newDate.setDate(newDate.getDate() + (newOffset * 7));
 
-                const startDate = new Date(activitiesStartDate);
-                startDate.setHours(0, 0, 0, 0);
-                if (newDate < startDate) {
+                // Get the Monday of the start date's week
+                const startDateObj = new Date(activitiesStartDate);
+                const startDay = startDateObj.getDay();
+                const startMonday = new Date(startDateObj);
+                startMonday.setDate(startDateObj.getDate() - startDay + (startDay === 0 ? -6 : 1));
+                startMonday.setHours(0, 0, 0, 0);
+
+                if (newDate < startMonday) {
                     return; // Silent block
                 }
             }
@@ -565,6 +584,8 @@ const Activities: React.FC = () => {
     }
 
     // --- REPORT GENERATION LOGIC ---
+    // NOTE: This function calculates points for ANY period, including periods BEFORE activitiesStartDate
+    // This allows viewing historical data in reports even after changing the equity start date
     const generateReportData = (start: string, end: string) => {
         const stats: Record<string, { unity: number, astreinte: number, workflow: number, weighted: number }> = {};
 
@@ -588,37 +609,27 @@ const Activities: React.FC = () => {
             };
         });
 
-        // Count from actual schedule data
         const startDate = new Date(start);
         const endDate = new Date(end);
         startDate.setHours(0, 0, 0, 0);
         endDate.setHours(23, 59, 59, 999);
 
-        // Use schedule + monthSchedule for counting
-        const allScheduleSlots = [...schedule, ...monthSchedule];
+        // Calculate history for the SPECIFIC period requested (independent of activitiesStartDate)
+        // This uses computeHistoryFromDate with the report's start date, NOT activitiesStartDate
+        const periodHistory = computeHistoryFromDate(
+            start, // Use the report's start date, not activitiesStartDate
+            endDate,
+            template,
+            unavailabilities,
+            doctors,
+            activityDefinitions,
+            rcpTypes,
+            manualOverrides
+        );
 
-        allScheduleSlots.forEach(s => {
-            if (!s.assignedDoctorId || !s.date) return;
-
-            const slotDate = new Date(s.date);
-            if (slotDate < startDate || slotDate > endDate) return;
-            if (!stats[s.assignedDoctorId]) return;
-
-            // Count by equity group
-            if (unityActivityIds.includes(s.activityId)) {
-                stats[s.assignedDoctorId].unity++;
-            }
-            if (astreinteActivityIds.includes(s.activityId)) {
-                stats[s.assignedDoctorId].astreinte++;
-            }
-            if (workflowActivityIds.includes(s.activityId) && s.day === DayOfWeek.MONDAY && s.period === Period.MORNING) {
-                stats[s.assignedDoctorId].workflow++;
-            }
-        });
-
-        // Add history counts for the period
+        // Count from computed period history
         doctors.forEach(d => {
-            const history = effectiveHistory[d.id];
+            const history = periodHistory[d.id];
             if (history) {
                 unityActivityIds.forEach(actId => {
                     stats[d.id].unity += history[actId] || 0;
@@ -703,6 +714,9 @@ const Activities: React.FC = () => {
             const doctorsByWeighted = [...doctors].sort((a, b) => reportStats[a.id].weighted - reportStats[b.id].weighted);
             const doctorsByWorkflow = [...doctors].sort((a, b) => reportStats[a.id].workflow - reportStats[b.id].workflow);
 
+            // Determine if this report is for a period BEFORE the equity start date
+            const isHistoricalReport = activitiesStartDate && new Date(pdfStartDate) < new Date(activitiesStartDate);
+
             // Build HTML
             let html = `
             <div style="font-family: sans-serif; color: #1e293b;">
@@ -710,7 +724,13 @@ const Activities: React.FC = () => {
                     <div>
                         <h1 style="font-size: 24px; font-weight: bold; margin: 0; color: #0f172a;">📊 Rapport d'Équité par Période</h1>
                         <p style="color: #64748b; margin: 5px 0 0 0;">Du <strong>${new Date(pdfStartDate).toLocaleDateString('fr-FR')}</strong> au <strong>${new Date(pdfEndDate).toLocaleDateString('fr-FR')}</strong></p>
-                        ${activitiesStartDate ? `<p style="color: #3b82f6; margin: 5px 0 0 0; font-size: 12px;">📅 Équité calculée depuis le ${new Date(activitiesStartDate).toLocaleDateString('fr-FR')}</p>` : ''}
+                        ${isHistoricalReport
+                    ? `<p style="color: #f59e0b; margin: 5px 0 0 0; font-size: 12px;">⚠️ <strong>Rapport historique</strong> - Période antérieure à la date de début de comptage d'équité (${new Date(activitiesStartDate!).toLocaleDateString('fr-FR')})</p>
+                               <p style="color: #64748b; margin: 3px 0 0 0; font-size: 11px; font-style: italic;">Ces points ne sont pas pris en compte dans le calcul d'équité actuel.</p>`
+                    : (activitiesStartDate
+                        ? `<p style="color: #3b82f6; margin: 5px 0 0 0; font-size: 12px;">📅 Date de début de comptage d'équité : ${new Date(activitiesStartDate).toLocaleDateString('fr-FR')}</p>`
+                        : '')
+                }
                     </div>
                     <div style="text-align: right;">
                         <div style="font-size: 12px; color: #94a3b8;">Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}</div>
@@ -908,7 +928,7 @@ const Activities: React.FC = () => {
                     </tbody>
                 </table>
 
-                <h2 style="font-size: 18px; color: #ea580c; border-bottom: 2px solid #fdba74; padding-bottom: 5px; margin-top: 20px; margin-bottom: 10px;">2. Points d'Équité Actuels</h2>
+                <h2 style="font-size: 18px; color: #ea580c; border-bottom: 2px solid #fdba74; padding-bottom: 5px; margin-top: 20px; margin-bottom: 10px;">2. Points d'Équité Actuels ${activitiesStartDate ? `<span style="font-size: 12px; font-weight: normal; color: #3b82f6;">(depuis le ${new Date(activitiesStartDate).toLocaleDateString('fr-FR')})</span>` : ''}</h2>
                 <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 30px;">
                     <thead>
                         <tr style="background-color: #fff7ed; border-bottom: 2px solid #fed7aa;">
@@ -1771,7 +1791,12 @@ const Activities: React.FC = () => {
                                                 <th className="p-2 font-bold text-slate-600">Médecin</th>
                                                 <th className="p-2 font-bold text-slate-500">Taux</th>
                                                 <th className="p-2 font-bold text-orange-500" title="Points UNIQUEMENT dans la période affichée (Sem./Mois)">Sem./Mois</th>
-                                                <th className="p-2 font-bold text-orange-700" title="Points TOTAL depuis le début (inclut historique + période actuelle)">Total U+A</th>
+                                                <th className="p-2 font-bold text-orange-700" title={activitiesStartDate ? `Points total depuis le ${new Date(activitiesStartDate).toLocaleDateString('fr-FR')}` : 'Points total (historique complet)'}>
+                                                    Total U+A
+                                                    {activitiesStartDate && (
+                                                        <span className="block text-[8px] font-normal text-orange-500">depuis le {new Date(activitiesStartDate).toLocaleDateString('fr-FR')}</span>
+                                                    )}
+                                                </th>
                                                 <th className="p-2 font-bold text-blue-600" title="Score pondéré = Total / Taux">Score Pondéré</th>
                                             </tr>
                                         </thead>
@@ -1835,7 +1860,12 @@ const Activities: React.FC = () => {
                                                 <th className="p-2 font-bold text-slate-600">Médecin</th>
                                                 <th className="p-2 font-bold text-slate-500">Taux</th>
                                                 <th className="p-2 font-bold text-emerald-500" title="Cette semaine">Sem.</th>
-                                                <th className="p-2 font-bold text-emerald-700" title="Cumul total">Cumul</th>
+                                                <th className="p-2 font-bold text-emerald-700" title={activitiesStartDate ? `Cumul depuis le ${new Date(activitiesStartDate).toLocaleDateString('fr-FR')}` : 'Cumul total'}>
+                                                    Cumul
+                                                    {activitiesStartDate && (
+                                                        <span className="block text-[8px] font-normal text-emerald-500">depuis le {new Date(activitiesStartDate).toLocaleDateString('fr-FR')}</span>
+                                                    )}
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
