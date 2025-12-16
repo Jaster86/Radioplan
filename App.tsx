@@ -138,6 +138,16 @@ const App: React.FC = () => {
         setConfigRcpViewModeState(mode);
     };
 
+    // Configuration RCP fullscreen mode - persisted in sessionStorage
+    const [configRcpFullscreen, setConfigRcpFullscreenState] = useState<boolean>(() => {
+        const saved = sessionStorage.getItem('config_rcpFullscreen');
+        return saved === 'true';
+    });
+    const setConfigRcpFullscreen = (fullscreen: boolean) => {
+        sessionStorage.setItem('config_rcpFullscreen', String(fullscreen));
+        setConfigRcpFullscreenState(fullscreen);
+    };
+
     const [schedule, setSchedule] = useState<ScheduleSlot[]>([]);
 
     // Ref to track if initial data has already been loaded (prevents reload on tab focus)
@@ -627,7 +637,8 @@ const App: React.FC = () => {
             dashboardWeekOffset, setDashboardWeekOffset,
             configActiveTab, setConfigActiveTab,
             configRcpWeekOffset, setConfigRcpWeekOffset,
-            configRcpViewMode, setConfigRcpViewMode
+            configRcpViewMode, setConfigRcpViewMode,
+            configRcpFullscreen, setConfigRcpFullscreen
         }}>
             <Router>
                 <Routes>

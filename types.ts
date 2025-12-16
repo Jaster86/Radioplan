@@ -252,7 +252,9 @@ export interface AppContextType {
   setConfigActiveTab: (tab: string) => void;
   configRcpWeekOffset: number; // Configuration RCP calendar week offset (survives re-renders)
   setConfigRcpWeekOffset: (offset: number) => void;
-  configRcpViewMode: 'RULES' | 'CALENDAR'; // NEW: RCP view mode (survives re-renders)
-  setConfigRcpViewMode: (mode: 'RULES' | 'CALENDAR') => void; // NEW
+  configRcpViewMode: 'RULES' | 'CALENDAR'; // RCP view mode (survives re-renders)
+  setConfigRcpViewMode: (mode: 'RULES' | 'CALENDAR') => void;
+  configRcpFullscreen: boolean; // RCP fullscreen mode (survives re-renders)
+  setConfigRcpFullscreen: (fullscreen: boolean) => void;
 }
 

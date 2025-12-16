@@ -19,6 +19,7 @@ const Profile: React.FC = () => {
         removeUnavailability,
         doctors,
         updateDoctor,
+        activityDefinitions,
         template,
         rcpTypes,
         rcpAttendance,
@@ -808,18 +809,78 @@ const Profile: React.FC = () => {
                     </ul>
                 </div>
 
-                {/* Info about Preferences - Now managed by Admin */}
+                {/* Preferences & Exclusions - Read Only Display */}
                 <div>
                     <h2 className="text-lg font-bold text-slate-800 mb-4 flex items-center">
                         <Briefcase className="w-5 h-5 mr-2 text-purple-500" />
-                        Préférences & Exclusions
+                        Mes Préférences & Exclusions
                     </h2>
-                    <div className="bg-slate-50 p-5 rounded-xl border border-slate-200">
-                        <p className="text-sm text-slate-600">
-                            Vos préférences et exclusions (jours non travaillés, activités exclues) sont gérées par l'administrateur.
-                        </p>
-                        <p className="text-sm text-slate-500 mt-2">
-                            Contactez votre responsable pour toute modification.
+
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        {/* Jours non travaillés */}
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center">
+                                <Calendar className="w-4 h-4 mr-2 text-red-500" />
+                                Jours non travaillés
+                            </h3>
+                            {currentDoctor.excludedDays && currentDoctor.excludedDays.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                    {currentDoctor.excludedDays.map(day => (
+                                        <span key={day} className="px-2 py-1 text-xs rounded bg-red-100 text-red-800 font-medium">
+                                            {day}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-400 italic">Aucun jour exclu</p>
+                            )}
+                        </div>
+
+                        {/* Activités exclues */}
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center">
+                                <AlertTriangle className="w-4 h-4 mr-2 text-slate-500" />
+                                Activités exclues
+                            </h3>
+                            {currentDoctor.excludedActivities && currentDoctor.excludedActivities.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                    {currentDoctor.excludedActivities.map(actId => {
+                                        const activity = activityDefinitions.find(a => a.id === actId);
+                                        return (
+                                            <span key={actId} className="px-2 py-1 text-xs rounded bg-slate-100 text-slate-600 font-medium line-through">
+                                                {activity?.name || actId}
+                                            </span>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-400 italic">Aucune activité exclue</p>
+                            )}
+                        </div>
+
+                        {/* Types de créneaux exclus */}
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-700 mb-2 flex items-center">
+                                <AlertTriangle className="w-4 h-4 mr-2 text-orange-500" />
+                                Types de créneaux exclus
+                            </h3>
+                            {currentDoctor.excludedSlotTypes && currentDoctor.excludedSlotTypes.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                    {currentDoctor.excludedSlotTypes.map(type => (
+                                        <span key={type} className="px-2 py-1 text-xs rounded bg-orange-100 text-orange-800 font-medium">
+                                            {type === SlotType.CONSULTATION ? 'Consultation' :
+                                                type === SlotType.RCP ? 'RCP' :
+                                                    type === SlotType.ACTIVITY ? 'Activité' : type}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-slate-400 italic">Aucun type exclu</p>
+                            )}
+                        </div>
+
+                        <p className="text-xs text-slate-400 pt-2 border-t border-slate-100">
+                            Ces paramètres sont gérés par l'administrateur. Contactez votre responsable pour toute modification.
                         </p>
                     </div>
                 </div>

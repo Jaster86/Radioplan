@@ -31,8 +31,10 @@ const Configuration: React.FC = () => {
         setConfigActiveTab,
         configRcpWeekOffset,
         setConfigRcpWeekOffset,
-        configRcpViewMode,    // NEW: Use context instead of local state
-        setConfigRcpViewMode, // NEW
+        configRcpViewMode,
+        setConfigRcpViewMode,
+        configRcpFullscreen,
+        setConfigRcpFullscreen,
         countingPeriods,
         createNewCountingPeriod
     } = useContext(AppContext);
@@ -67,7 +69,9 @@ const Configuration: React.FC = () => {
     };
 
     const [selectedExceptionSlot, setSelectedExceptionSlot] = useState<ScheduleSlot | null>(null);
-    const [isFullscreen, setIsFullscreen] = useState(false);
+    // isFullscreen now uses context for persistence
+    const isFullscreen = configRcpFullscreen;
+    const setIsFullscreen = setConfigRcpFullscreen;
     const [showNewPeriodModal, setShowNewPeriodModal] = useState(false);
     const [newPeriodDate, setNewPeriodDate] = useState('');
     const [newPeriodName, setNewPeriodName] = useState('');
@@ -1018,13 +1022,13 @@ const Configuration: React.FC = () => {
                 </div>
             )}
 
-            {/* MAIN GRID - with fullscreen support */}
+            {/* MAIN GRID - with fullscreen support (only for RCP Calendar view) */}
             <div
-                className={`${isFullscreen ? 'fixed inset-0 z-50 p-4 bg-slate-100' : 'flex-1'} overflow-auto bg-white rounded-xl shadow border border-slate-200`}
+                className={`${isFullscreen && activeTab === SlotType.RCP && rcpViewMode === 'CALENDAR' ? 'fixed inset-0 z-50 p-4 bg-slate-100' : 'flex-1'} overflow-auto bg-white rounded-xl shadow border border-slate-200`}
                 ref={tableContainerRef}
             >
-                {/* Fullscreen header */}
-                {isFullscreen && (
+                {/* Fullscreen header - only shown for RCP Calendar */}
+                {isFullscreen && activeTab === SlotType.RCP && rcpViewMode === 'CALENDAR' && (
                     <div className="flex justify-between items-center mb-4 bg-gradient-to-r from-purple-600 to-purple-500 text-white p-4 rounded-lg shadow-lg">
                         <div>
                             <h2 className="text-xl font-bold">Vue RCP - Calendrier</h2>
@@ -1078,7 +1082,7 @@ const Configuration: React.FC = () => {
                                     {days.map(day => (
                                         <th key={day} className={`p-3 border-b-2 border-r bg-slate-50 text-slate-700 font-bold uppercase text-xs w-1/5 min-w-[160px] ${activeTab === SlotType.RCP ? 'border-purple-200' : 'border-blue-200'}`}>
                                             {day}
-                                            {rcpViewMode === 'CALENDAR' && (
+                                            {activeTab === SlotType.RCP && rcpViewMode === 'CALENDAR' && (
                                                 <div className="font-normal text-[10px] text-purple-500 mt-1 bg-purple-50 px-2 py-0.5 rounded inline-block">
                                                     {getDateForDayOfWeek(currentCalendarWeekStart, day).split('-').slice(1).reverse().join('/')}
                                                 </div>
@@ -1124,7 +1128,7 @@ const Configuration: React.FC = () => {
                                             </td>
                                             {days.map(day => (
                                                 <td key={`${day}-matin`} className="border-r border-b p-1 h-24 relative bg-white">
-                                                    {rcpViewMode === 'CALENDAR'
+                                                    {activeTab === SlotType.RCP && rcpViewMode === 'CALENDAR'
                                                         ? renderCalendarCell(day, Period.MORNING, row.name)
                                                         : renderConfigCell(day, Period.MORNING, row.name)
                                                     }
@@ -1138,7 +1142,7 @@ const Configuration: React.FC = () => {
                                             </td>
                                             {days.map(day => (
                                                 <td key={`${day}-apres-midi`} className="border-r p-1 h-24 bg-slate-50/50 relative">
-                                                    {rcpViewMode === 'CALENDAR'
+                                                    {activeTab === SlotType.RCP && rcpViewMode === 'CALENDAR'
                                                         ? renderCalendarCell(day, Period.AFTERNOON, row.name)
                                                         : renderConfigCell(day, Period.AFTERNOON, row.name)
                                                     }
